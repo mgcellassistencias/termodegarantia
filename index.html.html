@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de XML - Termo de Garantia</title>
+    <!-- Incluindo o Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Biblioteca para gerar PDF programaticamente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Configuração do Tailwind para usar a fonte Inter -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'fundo': '#f3f4f6', 
+                        'cartao': '#ffffff', 
+                        'borda-cartao': '#e5e7eb', 
+                        'texto-principal': '#1f2937', 
+                        'texto-secundario': '#6b7280', 
+                        'laranja-acento': '#f97316', 
+                        'laranja-hover': '#ea580c',
+                        'whatsapp': '#25D366',
+                        'whatsapp-hover': '#128C7E'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Importando a fonte Inter do Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Estilo para a barra de rolagem */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #a0a0a0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #888; }
+
+        /* Inputs personalizados */
+        .doc-input {
+            background-color: #f9fafb; /* gray-50 */
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            width: 100%;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .doc-input:focus {
+            outline: none;
+            border-color: #f97316; /* laranja */
+            box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+        }
+
+        /* Estilos de Impressão A4 */
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0; padding: 0; background-color: #fff; font-size: 10pt; }
+            
+            .print-content {
+                position: absolute; top: 0; left: 0; width: 100%; height: auto; margin: 0;
+                padding: 1cm; border: none; box-shadow: none; background-color: #fff;
+                visibility: visible !important; display: block !important;
+            }
+
+            #output-container { height: auto !important; overflow: visible !important; padding: 0 !important; }
+
+            /* Transforma inputs em texto na impressão */
+            .doc-input, select.doc-input {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                -webkit-appearance: none; 
+                appearance: none;
+                font-weight: 600; 
+                color: #000 !important;
+                width: auto !important;
+                min-width: 50px;
+                display: inline-block;
+            }
+            
+            .text-laranja-acento { color: #000000 !important; }
+            .text-texto-principal { color: #000000 !important; }
+            .text-texto-secundario { color: #4b5563 !important; }
+            .bg-gray-50 { background-color: #fff !important; border: 1px solid #ddd !important; }
+
+            .print-content .grid { display: grid !important; }
+            .print-content > h2 { display: none; }
+        }
+    </style>
+</head>
+<body class="bg-fundo text-texto-principal font-inter min-h-screen p-4 sm:p-8 selection:bg-laranja-acento selection:text-white">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Título Principal -->
+        <h1 class="text-3xl font-bold text-center mb-8 text-laranja-acento no-print">Gerador de Termo de Garantia</h1>
+
+        <!-- Grid principal com 2 colunas -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Coluna de Entrada -->
+            <div class="bg-cartao border border-borda-cartao rounded-2xl shadow-sm overflow-hidden h-full no-print flex flex-col">
+                <h2 class="text-xl font-semibold text-laranja-acento p-5 border-b border-borda-cartao">
+                    1. Entrada XML (Do Checklist)
+                </h2>
+                <div class="p-5 flex-grow flex flex-col">
+                    <p class="text-sm text-texto-secundario mb-2">Cole abaixo o código XML gerado:</p>
+                    <textarea id="xml-input"
+                        class="w-full flex-grow min-h-[400px] bg-gray-50 rounded-lg p-4 font-mono text-xs border border-gray-300 focus:ring-2 focus:ring-laranja-acento focus:border-transparent outline-none resize-none"
+                        placeholder="<checklist>..."></textarea>
+                    <div class="mt-4 flex space-x-4">
+                        <button id="read-button"
+                            class="w-1/2 bg-laranja-acento text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-laranja-hover transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-laranja-acento/50 focus:ring-offset-2 focus:ring-offset-fundo">
+                            Ler XML e Gerar
+                        </button>
+                        <button id="print-button"
+                            class="w-1/2 bg-gray-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-700 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500/50 focus:ring-offset-2 focus:ring-offset-fundo disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            disabled>
+                            Imprimir Documento
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna de Saída -->
+            <div class="bg-cartao border border-borda-cartao rounded-2xl shadow-sm overflow-hidden h-full print-content">
+                <h2 class="text-xl font-semibold text-laranja-acento p-5 border-b border-borda-cartao no-print">
+                    2. Preenchimento e Visualização
+                </h2>
+                <div id="output-container" class="p-8 h-[800px] overflow-auto text-sm relative">
+                    <div class="flex flex-col items-center justify-center h-full text-texto-secundario no-print-placeholder">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>Aguardando processamento do XML...</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const readButton = document.getElementById('read-button');
+        const printButton = document.getElementById('print-button');
+        const xmlInput = document.getElementById('xml-input');
+        const outputContainer = document.getElementById('output-container');
+
+        // --- Funções de Máscara e Validação ---
+
+        function maskMoney(input) {
+            let value = input.value.replace(/\D/g, '');
+            value = (value / 100).toFixed(2) + '';
+            value = value.replace(".", ",");
+            value = value.replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+            input.value = "R$ " + value;
+        }
+
+        function maskDate(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 2) v = v.replace(/^(\d{2})(\d)/, '$1/$2');
+            if (v.length > 5) v = v.replace(/^(\d{2})\/(\d{2})(\d)/, '$1/$2/$3');
+            input.value = v.substring(0, 10);
+            
+            if(v.length >= 8) {
+                checkYear(input);
+            }
+        }
+
+        function checkYear(input) {
+            const parts = input.value.split('/');
+            if (parts.length === 3) {
+                const year = parseInt(parts[2]);
+                if (year < 2000 || year > 2100) {
+                    input.style.borderColor = 'red';
+                } else {
+                    input.style.borderColor = '#d1d5db'; 
+                    calculateWarrantyEnd(); 
+                }
+            }
+        }
+
+        function handlePaymentChange(select) {
+            const parcelasDiv = document.getElementById('div-parcelas');
+            if (select.value === 'Cartão de Crédito') {
+                parcelasDiv.classList.remove('hidden');
+                parcelasDiv.classList.add('inline-block'); 
+            } else {
+                parcelasDiv.classList.add('hidden');
+                parcelasDiv.classList.remove('inline-block');
+            }
+        }
+
+        function calculateWarrantyEnd() {
+            const retiradaInput = document.getElementById('input-retirada');
+            const diasInput = document.getElementById('input-garantia');
+            const validadeSpan = document.getElementById('span-validade');
+
+            if (!retiradaInput || !diasInput || !validadeSpan) return;
+
+            const dateStr = retiradaInput.value;
+            const days = parseInt(diasInput.value);
+
+            if (dateStr.length !== 10 || isNaN(days)) {
+                validadeSpan.textContent = "---";
+                return;
+            }
+
+            const [d, m, y] = dateStr.split('/');
+            const date = new Date(y, m - 1, d);
+            date.setDate(date.getDate() + days);
+
+            const dd = String(date.getDate()).padStart(2, '0');
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const yyyy = date.getFullYear();
+            
+            validadeSpan.textContent = `${dd}/${mm}/${yyyy}`;
+        }
+        
+        function updateSignatureDate() {
+            const retiradaInput = document.getElementById('input-retirada');
+            const spanDataLocal = document.getElementById('span-data-local');
+            if(retiradaInput && spanDataLocal) {
+                spanDataLocal.textContent = retiradaInput.value || '____/____/_______';
+            }
+        }
+
+        // --- Função de Integração com WhatsApp ---
+        
+        function sendToWhatsapp(phone, clientName, osNumber) {
+            // 1. Limpar o telefone
+            let cleanPhone = phone.replace(/\D/g, '');
+            
+            // Adiciona DDI do Brasil (55) se não tiver
+            if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
+                cleanPhone = '55' + cleanPhone;
+            }
+
+            if (cleanPhone.length < 12) {
+                alert("Número de telefone parece inválido para WhatsApp.");
+                return;
+            }
+
+            // 2. Preparar Mensagem
+            const message = `Olá, ${clientName}, segue em anexo sua ordem de Serviços ${osNumber}, nós da MGCELL agradecemos a sua escolha!`;
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+
+            // 3. Preparar Nome do Arquivo PDF
+            // Formato: nome_data_ordemdeserviço
+            // Usando a data de retirada se disponível, senão hoje
+            let dateStr = document.getElementById('input-retirada').value;
+            if (!dateStr || dateStr.length !== 10) {
+                const today = new Date();
+                const dd = String(today.getDate()).padStart(2, '0');
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const yyyy = today.getFullYear();
+                dateStr = `${dd}/${mm}/${yyyy}`;
+            }
+            
+            const safeName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const safeDate = dateStr.replace(/\//g, '-');
+            const filename = `${safeName}_${safeDate}_${osNumber}.pdf`;
+
+            // 4. Gerar e Baixar PDF -> Depois abrir WhatsApp
+            const element = document.getElementById('termo-garantia-content'); // Seleciona apenas o conteúdo do termo
+            
+            const opt = {
+                margin:       10, // mm
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Feedback visual
+            alert(`O PDF "${filename}" será baixado agora.\n\nComo o navegador não permite anexar arquivos automaticamente, por favor, ARRASTE o arquivo baixado para a conversa do WhatsApp que será aberta em seguida.`);
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Abre o WhatsApp após iniciar o download
+                window.open(whatsappUrl, '_blank');
+            });
+        }
+
+
+        // --- Processamento XML ---
+
+        function getText(xmlDoc, selector, defaultValue = '') {
+            const node = xmlDoc.querySelector(selector);
+            return node ? node.textContent.trim() : defaultValue;
+        }
+
+        function processXML() {
+            const xmlString = xmlInput.value.trim();
+            printButton.disabled = true; 
+            
+            if (!xmlString) {
+                outputContainer.innerHTML = '<p class="text-laranja-acento text-center mt-10">Por favor, cole o código XML.</p>';
+                return;
+            }
+
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+
+            const errorNode = xmlDoc.querySelector('parsererror');
+            if (errorNode) {
+                outputContainer.innerHTML = '<div class="text-red-500">Erro no XML. Verifique o código.</div>';
+                return;
+            }
+
+            const dados = {
+                clienteNome: getText(xmlDoc, 'dadosCliente > cliente'),
+                os: getText(xmlDoc, 'dadosCliente > os'),
+                endereco: getText(xmlDoc, 'dadosCliente > endereco'),
+                telefone: getText(xmlDoc, 'dadosCliente > telefone'),
+                email: getText(xmlDoc, 'dadosCliente > email'),
+                cpf: getText(xmlDoc, 'dadosCliente > cpf'),
+                marca: getText(xmlDoc, 'dadosAparelho > marca'),
+                modelo: getText(xmlDoc, 'dadosAparelho > modelo'),
+            };
+
+            // Renderização HTML
+            // Envolvi o conteúdo principal em <div id="termo-garantia-content"> para o html2pdf pegar apenas isso
+            outputContainer.innerHTML = `
+                <div id="termo-garantia-content" class="space-y-6 text-texto-principal bg-white p-4">
+                    
+                    <!-- Cabeçalho -->
+                    <div class="flex justify-between items-start border-b-2 border-gray-800 pb-4">
+                        <div>
+                            <h1 class="text-2xl font-bold text-laranja-acento uppercase">Termo de Garantia</h1>
+                            <p class="text-xs text-texto-secundario mt-1">MGCELL ASSISTÊNCIA TÉCNICA</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-texto-secundario">Ordem de Serviço</p>
+                            <p class="text-xl font-bold font-mono">${dados.os}</p>
+                        </div>
+                    </div>
+
+                    <!-- 1. Dados do Cliente -->
+                    <div class="bg-gray-50 p-4 rounded border border-gray-200 print:border-gray-300">
+                        <h3 class="text-sm font-bold text-laranja-acento uppercase mb-2 border-b border-gray-200 pb-1">Dados do Cliente</h3>
+                        <div class="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                            <div><span class="font-semibold text-texto-secundario block text-xs">Nome:</span> ${dados.clienteNome}</div>
+                            <div><span class="font-semibold text-texto-secundario block text-xs">CPF:</span> ${dados.cpf}</div>
+                            
+                            <!-- Telefone com Botão WhatsApp -->
+                            <div class="flex items-center gap-2">
+                                <div>
+                                    <span class="font-semibold text-texto-secundario block text-xs">Telefone:</span> 
+                                    ${dados.telefone}
+                                </div>
+                                <!-- Botão WhatsApp (Não aparece na impressão) -->
+                                <button onclick="sendToWhatsapp('${dados.telefone}', '${dados.clienteNome}', '${dados.os}')" 
+                                        class="no-print bg-whatsapp hover:bg-whatsapp-hover text-white p-1 rounded-full shadow-sm transition-colors ml-2" 
+                                        title="Gerar PDF e Enviar no WhatsApp">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div><span class="font-semibold text-texto-secundario block text-xs">E-mail:</span> ${dados.email}</div>
+                            <div class="col-span-2"><span class="font-semibold text-texto-secundario block text-xs">Endereço:</span> ${dados.endereco}</div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Dados do Aparelho -->
+                    <div class="bg-gray-50 p-4 rounded border border-gray-200 print:border-gray-300">
+                        <h3 class="text-sm font-bold text-laranja-acento uppercase mb-2 border-b border-gray-200 pb-1">Dados do Aparelho</h3>
+                        <div class="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                            <div><span class="font-semibold text-texto-secundario block text-xs">Marca:</span> ${dados.marca}</div>
+                            <div><span class="font-semibold text-texto-secundario block text-xs">Modelo:</span> ${dados.modelo}</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Detalhes do Serviço -->
+                    <div class="bg-white border border-gray-200 p-4 rounded print:border-gray-300">
+                         <h3 class="text-sm font-bold text-laranja-acento uppercase mb-3 border-b border-gray-200 pb-1">Detalhes do Serviço e Pagamento</h3>
+                         
+                         <div class="grid grid-cols-12 gap-4 text-sm items-end">
+                            
+                            <!-- Serviço Executado -->
+                            <div class="col-span-12 md:col-span-8">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Serviço Executado:</label>
+                                <input type="text" class="doc-input" maxlength="100" placeholder="Descreva o serviço (max 100 chars)">
+                            </div>
+
+                            <!-- Valor -->
+                            <div class="col-span-6 md:col-span-4">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Valor:</label>
+                                <input type="text" class="doc-input text-right font-mono" placeholder="R$ 0,00" oninput="maskMoney(this)">
+                            </div>
+
+                            <!-- Forma de Pagamento -->
+                            <div class="col-span-12 md:col-span-6">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Forma de Pagamento:</label>
+                                <select class="doc-input" onchange="handlePaymentChange(this)">
+                                    <option value="À vista (Dinheiro)">À vista (Dinheiro)</option>
+                                    <option value="À vista (PIX)">À vista (PIX)</option>
+                                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                                </select>
+                            </div>
+
+                            <!-- Parcelas -->
+                            <div id="div-parcelas" class="col-span-6 md:col-span-2 hidden">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Parcelas:</label>
+                                <select class="doc-input">
+                                    <option value="1x">1x</option>
+                                    <option value="2x">2x</option>
+                                    <option value="3x">3x</option>
+                                    <option value="4x">4x</option>
+                                    <option value="5x">5x</option>
+                                    <option value="6x">6x</option>
+                                    <option value="12x">12x</option>
+                                </select>
+                            </div>
+
+                            <!-- Espaçador -->
+                            <div class="col-span-12 border-t border-gray-100 my-2"></div>
+
+                            <!-- Retirada -->
+                            <div class="col-span-6 md:col-span-4">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Data Retirada:</label>
+                                <input type="text" id="input-retirada" class="doc-input text-center" placeholder="DD/MM/AAAA" oninput="maskDate(this); updateSignatureDate()" onblur="checkYear(this)">
+                            </div>
+
+                            <!-- Garantia -->
+                            <div class="col-span-3 md:col-span-3">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Garantia (Dias):</label>
+                                <input type="number" id="input-garantia" class="doc-input text-center" placeholder="90" value="90" oninput="calculateWarrantyEnd()">
+                            </div>
+
+                            <!-- Validade -->
+                            <div class="col-span-3 md:col-span-5">
+                                <label class="font-semibold text-texto-secundario block text-xs mb-1">Válida até:</label>
+                                <div class="p-2 bg-gray-100 rounded text-center font-bold border border-gray-200 print:border-none print:bg-transparent print:text-left print:p-0">
+                                    <span id="span-validade">---</span>
+                                </div>
+                            </div>
+
+                         </div>
+                    </div>
+
+                    <!-- 4. Avisos Importantes -->
+                    <div class="mt-4 border border-gray-300 p-3 rounded text-xs text-texto-secundario bg-white">
+                        <h4 class="font-bold text-texto-principal mb-2 uppercase">Termos e Condições</h4>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>A MGCELL não se responsabiliza por equipamentos abandonados na loja após 90 dias.</li>
+                            <li>Após aviso de retirada, caso não ocorra em 5 dias, será cobrada taxa de armazenamento (R$ 2,00/dia).</li>
+                            <li>A retirada está condicionada à apresentação desta Ordem de Serviço.</li>
+                            <li><strong>A garantia cobre apenas o serviço executado e a peça trocada; não cobre mau uso, quedas, trincos, arranhões na tela, líquidos, etc.</strong></li>
+                            <li>Valores parcelados podem sofrer alteração conforme taxas da bandeira do cartão.</li>
+                        </ol>
+                    </div>
+
+                    <!-- Assinatura -->
+                    <div class="pt-12 pb-4 flex justify-between items-end">
+                        <div class="text-xs text-texto-secundario w-1/2">
+                             Local e Data: <span class="font-semibold text-texto-principal">São Bernardo do Campo/SP</span>, <span id="span-data-local" class="font-semibold text-texto-principal"></span>
+                        </div>
+                        <div class="text-center w-1/2">
+                            <div class="border-b border-black mb-2"></div>
+                            <p class="text-xs font-bold uppercase">${dados.clienteNome}</p>
+                            <p class="text-[10px] text-texto-secundario">Assinatura do Cliente</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Inicializa data de hoje
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            const retiradaInput = document.getElementById('input-retirada');
+            if(retiradaInput) {
+                retiradaInput.value = `${dd}/${mm}/${yyyy}`;
+                calculateWarrantyEnd(); 
+                updateSignatureDate(); 
+            }
+            
+            printButton.disabled = false;
+        }
+
+        // Listeners
+        readButton.addEventListener('click', processXML);
+
+        printButton.addEventListener('click', () => {
+            const originalTitle = document.title;
+            const cliente = document.querySelector('.font-bold.uppercase')?.innerText || 'Cliente';
+            const os = document.querySelector('.font-mono.font-bold')?.innerText || 'OS';
+            document.title = `Garantia - ${cliente} - ${os}`;
+            window.print();
+            document.title = originalTitle;
+        });
+
+    </script>
+
+</body>
+</html>
